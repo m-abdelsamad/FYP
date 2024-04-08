@@ -1,0 +1,8 @@
+# Custom weights folder (used for for testing).
+weights/
+
+# Weights and Biases
+wandb/*
+
+# IPython checkpoints
+.ipynb_checkpoints

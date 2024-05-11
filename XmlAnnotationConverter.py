@@ -61,7 +61,7 @@ def create_xml_files(annotations_table, images_folder, category_mapping, output_
         tree.write(xml_filename)
 
 # Define the path to the annotations file
-annotations_path = '/notebooks/fasterrcnn-pytorch-training-pipeline/data_configs/xray_train.json'
+annotations_path = '/data_configs/xray_train.json'
 
 # Load the annotations
 with open(annotations_path) as json_file:
@@ -85,17 +85,6 @@ for annotation in annotations['annotations']:
 
 annotations_table = pd.DataFrame(table_data)
 category_mapping = {category['id']: category['name'] for category in annotations['categories']}
-
-# Split data into training and validation
-# random.shuffle(table_data)
-# split_index = int(len(table_data) * 0.8)
-# train_data = table_data[:split_index]
-# val_data = table_data[split_index:]
-
-# train_annotations_table = pd.DataFrame(train_data)
-# val_annotations_table = pd.DataFrame(val_data)
-
-#annotations_table = pd.DataFrame(table_data)
 annotations_table = annotations_table.sample(frac=1).reset_index(drop=True)
 
 # Split the shuffled DataFrame
@@ -110,8 +99,10 @@ val_images_folder = './data/val/images'
 train_annotations_folder = './data/train/annotations'
 val_annotations_folder = './data/val/annotations'
 
+original_images_folder = './data/pidimages/train'
+
 # Create XML files and organize images for training and validation sets
-create_xml_files(train_annotations_table, './data/pidimages/train', category_mapping, train_images_folder, train_annotations_folder)
-create_xml_files(val_annotations_table, './data/pidimages/train', category_mapping, val_images_folder, val_annotations_folder)
+create_xml_files(train_annotations_table, original_images_folder, category_mapping, train_images_folder, train_annotations_folder)
+create_xml_files(val_annotations_table, original_images_folder, category_mapping, val_images_folder, val_annotations_folder)
 
 print("Training and validation sets created.")

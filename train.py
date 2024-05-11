@@ -1,18 +1,12 @@
 """
 USAGE
 
-# training with Faster RCNN ResNet50 FPN model without mosaic or any other augmentation:
-python train.py --model fasterrcnn_resnet50_fpn --epochs 2 --data data_configs/voc.yaml --mosaic 0 --batch 4
+# training with Faster RCNN ResNet50 model without mosaic or any other augmentation:
+python train.py --model fasterrcnn_resnet50 --epochs 2 --data data_configs/config.yaml --mosaic 0 --batch 16
 
-# Training on ResNet50 FPN with custom project folder name with mosaic augmentation (ON by default):
-python train.py --model fasterrcnn_resnet50_fpn --epochs 2 --data data_configs/voc.yaml --name resnet50fpn_voc --batch 4
+# Training on ResNet50 with mosaic augmentation (ON by default) and added training augmentations:
+python train.py --model fasterrcnn_resnet50_fpn --epochs 2 --use-train-aug --data data_configs/config.yaml --batch 16
 
-# Training on ResNet50 FPN with custom project folder name with mosaic augmentation (ON by default) and added training augmentations:
-python train.py --model fasterrcnn_resnet50_fpn --epochs 2 --use-train-aug --data data_configs/voc.yaml --name resnet50fpn_voc --batch 4
-
-# Distributed training:
-export CUDA_VISIBLE_DEVICES=0,1
-python -m torch.distributed.launch --nproc_per_node=2 --use_env train.py --data data_configs/smoke.yaml --epochs 100 --model fasterrcnn_resnet50_fpn --name smoke_training --batch 16
 """
 from torch_utils.engine import (
     train_one_epoch, evaluate, utils
@@ -77,7 +71,7 @@ def parse_opt():
     )
     parser.add_argument(
         '-e', '--epochs', 
-        default=5,
+        default=10,
         type=int,
         help='number of epochs to train for'
     )
@@ -89,7 +83,7 @@ def parse_opt():
     )
     parser.add_argument(
         '-b', '--batch', 
-        default=4, 
+        default=32, 
         type=int, 
         help='batch size to load the data'
     )
@@ -101,7 +95,7 @@ def parse_opt():
     )
     parser.add_argument(
         '-ims', '--imgsz',
-        default=640, 
+        default=256, 
         type=int, 
         help='image size to feed to the network'
     )
@@ -379,17 +373,20 @@ def main(args):
     # Get the model parameters.
     params = [p for p in model.parameters() if p.requires_grad]
     # Define the optimizer.
-    optimizer = torch.optim.SGD(params, lr=args['lr'], momentum=0.9, nesterov=True)
-    # optimizer = torch.optim.AdamW(params, lr=0.0001, weight_decay=0.0005)
+    
+    optimizer = torch.optim.Adam(params, lr=args['lr'], weight_decay=0.0001)
+    
+    # Adjust the Optimizer As Needed
+    # optimizer = torch.optim.SGD(params, lr=args['lr'], momentum=0.9, weight_decay=0.0001)
+    # optimizer = torch.optim.AdamW(params, lr=0.0001, weight_decay=0.0001)
+    
     if args['resume_training']: 
         # LOAD THE OPTIMIZER STATE DICTIONARY FROM THE CHECKPOINT.
         print('Loading optimizer state dictionary...')
         optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
 
     if args['cosine_annealing']:
-        # LR will be zero as we approach `steps` number of epochs each time.
-        # If `steps = 5`, LR will slowly reduce to zero every 5 epochs.
-        steps = NUM_EPOCHS + 10
+        steps = 50
         scheduler = torch.optim.lr_scheduler.CosineAnnealingWarmRestarts(
             optimizer, 
             T_0=steps,

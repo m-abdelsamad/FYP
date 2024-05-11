@@ -95,7 +95,8 @@ def create_model(num_classes=13, pretrained=True):
     layer3 = model_backbone.layer3
     layer4 = model_backbone.layer4
     
-    cbam_block = CBAMBlock(in_channels=2048)
+    cbam_block1 = CBAMBlock(in_channels=512)
+    cbam_block2 = CBAMBlock(in_channels=2048)
 
     aspp = ASPP(in_ch=2048, out_ch=512, rates=[6, 12, 18])
     
@@ -104,11 +105,12 @@ def create_model(num_classes=13, pretrained=True):
         bn1, 
         relu, 
         max_pool, 
-        layer1, 
-        layer2, 
-        layer3, 
-        layer4,
-        cbam_block,
+        layer1, # Residual Block 1 -> out channel 256
+        layer2, # Residual Block 2 -> out channel 512
+        cbam_block1, 
+        layer3, # Residual Block 3 -> out channel 1024
+        layer4, # Residual Block 4 -> out channel 2048
+        cbam_block2,
         aspp
     )
 

@@ -6,8 +6,6 @@ from torchvision.models.detection.rpn import AnchorGenerator
 
 import warnings
 from typing import Callable, Dict, List, Optional, Union, Tuple
-# from typing import Callable, List, Optional, Tuple
-
 
 from torch import nn, Tensor
 from torchvision.ops import misc as misc_nn_ops
@@ -32,7 +30,6 @@ class IntermediateLayerGetter(nn.ModuleDict):
     This means that one should **not** reuse the same nn.Module
     twice in the forward if you want this to work.
 
-
     Additionally, it is only able to query submodules that are directly
     assigned to the model. So if `model` is passed, `model.feature1` can
     be returned, but not `model.feature1.layer2`.
@@ -44,21 +41,13 @@ class IntermediateLayerGetter(nn.ModuleDict):
         and the value of the dict is the name of the returned activation 
     """
     def __init__(self,model:nn.Module,return_layers:Dict[str,str])-> None:
-        # 检查model名称是否匹配
-        """
-        print(return_layers)
-        {'layer1': '0', 'layer2': '1', 'layer3': '2', 'layer4': '3'}
-        """
         if not set(return_layers).issubset([name for name,_ in model.named_children()]):
             raise ValueError("return_layers are not present in model")
-        """
-        eg:{'layer1': 'feat1', 'layer3': 'feat2'}
-        """
+
         orig_return_layers=return_layers
         return_layers={str(k):str(v) for k,v in return_layers.items()}
 
         layers=OrderedDict()
-        # we just need submodule before our query
         for name,module in model.named_children():
             layers[name]=module
             if name in return_layers:
@@ -160,47 +149,6 @@ def _resnet_fpn_extractor(
         backbone, return_layers, in_channels_list, out_channels, extra_blocks=extra_blocks, norm_layer=norm_layer
     )
 
-class ASPP(nn.Module):
-    """
-    Atrous spatial pyramid pooling (ASPP)
-    """
-
-    def __init__(self, in_ch, out_ch, rates):
-        super(ASPP, self).__init__()
-        self.out_ch = out_ch  # Store out_ch as an instance attribute
-        for i, rate in enumerate(rates):
-            self.add_module(
-                "c{}".format(i),
-                nn.Conv2d(in_ch, out_ch, 3, 1, padding=rate, dilation=rate, bias=True),
-            )
-
-        for m in self.children():
-            nn.init.normal_(m.weight, mean=0, std=0.01)
-            nn.init.constant_(m.bias, 0)
-
-    def forward(self, x):
-        return sum([stage(x) for stage in self.children()])
-
-    
-class CustomBackbone(nn.Module):
-    def __init__(self, backbone_with_fpn, aspp):
-        super().__init__()
-        self.backbone_with_fpn = backbone_with_fpn
-        self.aspp = aspp
-        # Assuming aspp.out_ch is correctly set to reflect ASPP's output channels
-        self.out_channels = aspp.out_ch
-
-    def forward(self, x):
-        # Get FPN output, which is a dictionary of feature maps
-        features = self.backbone_with_fpn(x)
-        
-        # Apply ASPP selectively or modify this logic as needed for your application
-        for key, feature in features.items():
-            features[key] = self.aspp(feature)
-        
-        return features
-    
-
 
 class FastRCNNConvFCHead(nn.Sequential):
     def __init__(
@@ -266,23 +214,9 @@ def create_model(num_classes=13, pretrained=True):
         trainable_layers=trainable_layers,
         returned_layers=returned_layers,
         extra_blocks=extra_blocks,
-        norm_layer=norm_layer  # or specify a normalization layer
+        norm_layer=norm_layer
     )
 
-    # aspp = ASPP(in_ch=256, out_ch=128, rates=[6, 12, 18])
-    # backbone = CustomBackbone(backbone_with_fpn, aspp)
-
-    # Check if the backbone_with_fpn is indeed of type BackboneWithFPN
-    # assert isinstance(backbone_with_fpn, BackboneWithFPN)
-
-
-    # Generate anchors using the RPN. Here, we are using 5x3 anchors.
-    # Meaning, anchors with 5 different sizes and 3 different aspect 
-    # ratios.
-    # anchor_generator = AnchorGenerator(
-    #     sizes=((32, 64, 128, 256, 512),),
-    #     aspect_ratios=((0.5, 1.0, 2.0),)
-    # )
     # Define anchor sizes and aspect ratios for each FPN level
     # Assuming FPN produces 5 levels of feature maps
     anchor_sizes = ((32,), (64,), (128,), (256,), (512,))
@@ -291,29 +225,18 @@ def create_model(num_classes=13, pretrained=True):
     # Create the anchor generator with specified sizes and aspect ratios
     anchor_generator = AnchorGenerator(sizes=anchor_sizes, aspect_ratios=aspect_ratios)
 
-
     rpn_head = RPNHead(backbone_with_fpn.out_channels, anchor_generator.num_anchors_per_location()[0], conv_depth=2)
     box_head = FastRCNNConvFCHead(
         (backbone_with_fpn.out_channels, 7, 7), [256, 256, 256, 256], [1024], norm_layer=nn.BatchNorm2d
     )
 
-    # Feature maps to perform RoI cropping.
-    # If backbone returns a Tensor, `featmap_names` is expected to
-    # be [0]. We can choose which feature maps to use.
-    # roi_pooler = torchvision.ops.MultiScaleRoIAlign(
-    #     featmap_names=['0'],
-    #     output_size=7,
-    #     sampling_ratio=2
-    # )
-
-    # Final Faster RCNN model.
+    # Final Faster RCNN model with FPN added to Backbone.
     model = FasterRCNN(
         backbone=backbone_with_fpn,
         num_classes=num_classes,
         rpn_anchor_generator=anchor_generator,
         rpn_head=rpn_head,
         box_head=box_head
-        # box_roi_pool=roi_pooler
     )
 
     return model

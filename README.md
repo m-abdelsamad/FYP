@@ -43,6 +43,10 @@ TRAIN_DIR_LABELS: ../data/train/annotations
 VALID_DIR_IMAGES: ../data/val/images
 VALID_DIR_LABELS: ../data/val/annotations
 
+# Optional test data path. If given, test paths (data) will be used in the `eval.py` script.
+# TEST_DIR_IMAGES: ../data/test/images
+# TEST_DIR_LABELS: ../data/test/annotations
+
 # Class names
 CLASSES: [
     '__background__',
